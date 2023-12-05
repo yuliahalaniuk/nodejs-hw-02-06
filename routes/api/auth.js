@@ -103,9 +103,6 @@ authRouter.post("/login", isEmptyBody, userLoginValidate, async (req, res) => {
 
 authRouter.post("/logout", auth, async (req, res) => {
   try {
-    if (!req.user) {
-      throw HttpError(400, "Bad password");
-    }
     if (req.user) {
       await User.findByIdAndUpdate(req.user._id, { token: "" });
     }
