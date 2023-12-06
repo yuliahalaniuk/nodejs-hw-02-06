@@ -1,7 +1,9 @@
 import express from "express";
-import Contact from "../../models/contacts.js";
 import { isValidObjectId } from "mongoose";
 import Joi from "joi";
+import Contact from "../../models/contacts.js";
+import { HttpError } from "../../helpers/HttpError.js";
+import { auth } from "../../middleware/auth.js";
 
 const router = express.Router();
 
@@ -17,6 +19,7 @@ const contactAddSchema = Joi.object({
   }),
   favorite: Joi.boolean(),
 });
+
 const contactUpdateSchema = Joi.object({
   name: Joi.string(),
   email: Joi.string().email(),
@@ -27,33 +30,32 @@ const contactUpdateFavoriteSchema = Joi.object({
   favorite: Joi.boolean().required(),
 });
 
-const HttpError = (status, message) => {
-  const error = new Error(message);
-  error.status = status;
-  return error;
-};
-
-router.get("/", async (req, res, next) => {
+router.get("/", auth, async (req, res, next) => {
   try {
-    const result = await Contact.find();
+    const { _id: owner } = req.user;
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const result = await Contact.find({ owner }, "", { skip, limit }).populate(
+      "owner",
+      "email subscription"
+    );
     res.json(result);
   } catch (error) {
     next(error);
   }
 });
 
-router.get("/:contactId", async (req, res, next) => {
+router.get("/:contactId", auth, async (req, res, next) => {
   try {
+    const { _id: owner } = req.user;
+
     const { contactId } = req.params;
 
-    if (!isValidObjectId(contactId)) {
-      throw HttpError(404, `${contactId} not valid id`);
-    }
-
-    const result = await Contact.findById(contactId);
+    const result = await Contact.findOne({ _id: contactId, owner });
 
     if (!result) {
-      throw HttpError(404, `Contact with id: ${contactId}  not found`);
+      throw HttpError(404, `Contact with ${contactId} id not found`);
     }
 
     res.json(result);
@@ -62,7 +64,7 @@ router.get("/:contactId", async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", auth, async (req, res, next) => {
   try {
     if (!Object.keys(req.body).length) {
       throw HttpError(400, "Missing required  fields");
@@ -74,34 +76,33 @@ router.post("/", async (req, res, next) => {
       throw HttpError(400, error.message);
     }
 
-    const result = await Contact.create(req.body);
+    const { _id: owner } = req.user;
+
+    const result = await Contact.create({ ...req.body, owner });
     res.status(201).json(result);
   } catch (error) {
     next(error);
   }
 });
 
-router.delete("/:contactId", async (req, res, next) => {
+router.delete("/:contactId", auth, async (req, res, next) => {
   try {
+    const { _id: owner } = req.user;
     const { contactId } = req.params;
 
-    if (!isValidObjectId(contactId)) {
-      throw HttpError(404, `${contactId} not valid id`);
+    const result = await Contact.findOneAndDelete({ _id: contactId });
+
+    if (!result) {
+      throw HttpError(404, `Contact with ${contactId} id not found`);
     }
 
-    const result = await Contact.findByIdAndDelete(contactId);
-    if (!result) {
-      throw HttpError(404, `Contact with ${contactId} not found`);
-    }
-    res.json({
-      message: "Contact deleted",
-    });
+    res.json({ message: "Contact deleted" });
   } catch (error) {
     next(error);
   }
 });
 
-router.put("/:contactId", async (req, res, next) => {
+router.put("/:contactId", auth, async (req, res, next) => {
   try {
     const { contactId } = req.params;
 
@@ -118,9 +119,16 @@ router.put("/:contactId", async (req, res, next) => {
       throw HttpError(400, error.message);
     }
 
-    const result = await Contact.findByIdAndUpdate(contactId, req.body, {
-      new: true,
-    });
+    const { _id: owner } = req.user;
+
+    const result = await Contact.findByIdAndUpdate(
+      { _id: contactId, owner },
+      req.body,
+      {
+        new: true,
+      }
+    );
+
     if (!result) {
       throw HttpError(404, `Contact with ${contactId} not found`);
     }
