@@ -181,24 +181,24 @@ authRouter.patch(
   }
 );
 
-authRouter.get("/avatars/getMy", auth, async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user._id);
+// authRouter.get("/avatars/getMy", auth, async (req, res, next) => {
+//   try {
+//     const user = await User.findById(req.user._id);
 
-    if (user === null) {
-      throw HttpError(404, "User Not Found");
-    }
+//     if (user === null) {
+//       throw HttpError(404, "User Not Found");
+//     }
 
-    if (user.avatarURL === null) {
-      throw HttpError(404, "Avatar Not Found");
-    }
+//     if (user.avatarURL === null) {
+//       throw HttpError(404, "Avatar Not Found");
+//     }
 
-    res.send({
-      avatarURL: user.avatarURL,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+//     res.send({
+//       avatarURL: user.avatarURL,
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// });
 
 export default authRouter;
