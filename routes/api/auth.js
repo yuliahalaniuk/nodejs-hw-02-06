@@ -11,10 +11,12 @@ import Jimp from "jimp";
 import { auth } from "../../middleware/auth.js";
 import { HttpError } from "../../helpers/HttpError.js";
 import User, {
+  userAvatarSchema,
   userLoginSchema,
   userRegisterSchema,
 } from "../../models/user.js";
 import { upload } from "../../middleware/upload.js";
+import checkBody from "../../middleware/checkBody.js";
 
 import dotenv from "dotenv";
 import sendEmail from "../../helpers/sendEmail.js";
@@ -29,19 +31,13 @@ const { JWT_SECRET } = process.env;
 const validateBody = (schema) => {
   const func = (req, res, next) => {
     const { error } = schema.validate(req.body);
+
     if (error) {
       return next(HttpError(400, error.message));
     }
     next();
   };
   return func;
-};
-
-const isEmptyBody = (req, res, next) => {
-  if (!Object.keys(req.body).length) {
-    return next(HttpError(400, "Missing required name field"));
-  }
-  next();
 };
 
 const userRegisterValidate = validateBody(userRegisterSchema);
@@ -51,7 +47,7 @@ const authRouter = express.Router();
 
 authRouter.post(
   "/signup",
-  isEmptyBody,
+  checkBody,
   userRegisterValidate,
   async (req, res, next) => {
     try {
@@ -89,49 +85,44 @@ authRouter.post(
   }
 );
 
-authRouter.post(
-  "/login",
-  isEmptyBody,
-  userLoginValidate,
-  async (req, res, next) => {
-    try {
-      const { email, password } = req.body;
-      const user = await User.findOne({ email });
+authRouter.post("/login", checkBody, userLoginValidate, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
 
-      if (user === null) {
-        throw HttpError(401, "Email or password is wrong");
-      }
-
-      if (!user.verify) {
-        throw HttpError(401, "This email is not verified");
-      }
-
-      const isMatch = await bcrypt.compare(password, user.password);
-
-      if (!isMatch) {
-        throw HttpError(401, "Email or password is wrong");
-      }
-
-      const payload = {
-        contactId: user._id,
-      };
-
-      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "20h" });
-
-      await User.findByIdAndUpdate(user._id, { token });
-
-      res.json({
-        token,
-        user: {
-          email: user.email,
-          subscription: user.subscription,
-        },
-      });
-    } catch (error) {
-      next(error);
+    if (user === null) {
+      throw HttpError(401, "Email or password is wrong");
     }
+
+    if (!user.verify) {
+      throw HttpError(401, "This email is not verified");
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      throw HttpError(401, "Email or password is wrong");
+    }
+
+    const payload = {
+      contactId: user._id,
+    };
+
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "20h" });
+
+    await User.findByIdAndUpdate(user._id, { token });
+
+    res.json({
+      token,
+      user: {
+        email: user.email,
+        subscription: user.subscription,
+      },
+    });
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 authRouter.post("/logout", auth, async (req, res) => {
   try {
@@ -162,6 +153,14 @@ authRouter.patch(
   upload.single("avatar"),
   async (req, res, next) => {
     try {
+      const { error: fileError } = userAvatarSchema.validate({
+        avatar: req.file,
+      });
+
+      if (fileError) {
+        throw HttpError(400, `Invalid file information`);
+      }
+
       const avatarPath = path.join(
         __dirname,
         "..",

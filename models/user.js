@@ -54,6 +54,21 @@ export const userLoginSchema = Joi.object({
   email: Joi.string().pattern(emailRegexp).required(),
 });
 
+export const userAvatarSchema = Joi.object({
+  avatar: Joi.object({
+    fieldname: Joi.string().valid("avatar").required(),
+    originalname: Joi.string().required(),
+    encoding: Joi.string().required(),
+    mimetype: Joi.string()
+      .valid("image/png", "image/jpeg", "image/gif")
+      .required(),
+    size: Joi.number().required(),
+    destination: Joi.string().required(),
+    filename: Joi.string().required(),
+    path: Joi.string().required(),
+  }).required(),
+});
+
 const User = model("user", userSchema);
 
 export default User;
