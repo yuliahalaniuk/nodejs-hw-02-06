@@ -17,6 +17,8 @@ import User, {
 import { upload } from "../../middleware/upload.js";
 
 import dotenv from "dotenv";
+import sendEmail from "../../helpers/sendEmail.js";
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -61,11 +63,20 @@ authRouter.post(
       }
 
       const hashPassword = await bcrypt.hash(password, 10);
+      const verificationToken = crypto.randomUUID();
+
+      await sendEmail({
+        to: "yuhalaniuk@ukr.net",
+        subject: "Email Confirmation",
+        html: `<a target="_blank" href='http://localhost:3000/users/verify/${verificationToken}'>Please click on the this link to confirm your email</a>`,
+        text: `Please click on the following link to confirm your email: http://localhost:3000/users/verify/${verificationToken}`,
+      });
 
       const newUser = await User.create({
         ...req.body,
         password: hashPassword,
         avatarURL: gravatar.url(email),
+        verificationToken,
       });
 
       res.status(201).json({
@@ -78,40 +89,49 @@ authRouter.post(
   }
 );
 
-authRouter.post("/login", isEmptyBody, userLoginValidate, async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
+authRouter.post(
+  "/login",
+  isEmptyBody,
+  userLoginValidate,
+  async (req, res, next) => {
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
 
-    if (user === null) {
-      throw HttpError(401, "Email or password is wrong");
+      if (user === null) {
+        throw HttpError(401, "Email or password is wrong");
+      }
+
+      if (!user.verify) {
+        throw HttpError(401, "This email is not verified");
+      }
+
+      const isMatch = await bcrypt.compare(password, user.password);
+
+      if (!isMatch) {
+        throw HttpError(401, "Email or password is wrong");
+      }
+
+      const payload = {
+        contactId: user._id,
+      };
+
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "20h" });
+
+      await User.findByIdAndUpdate(user._id, { token });
+
+      res.json({
+        token,
+        user: {
+          email: user.email,
+          subscription: user.subscription,
+        },
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      throw HttpError(401, "Email or password is wrong");
-    }
-
-    const payload = {
-      contactId: user._id,
-    };
-
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "20h" });
-
-    await User.findByIdAndUpdate(user._id, { token });
-
-    res.json({
-      token,
-      user: {
-        email: user.email,
-        subscription: user.subscription,
-      },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 authRouter.post("/logout", auth, async (req, res) => {
   try {
@@ -180,6 +200,59 @@ authRouter.patch(
     }
   }
 );
+
+authRouter.get("/verify/:verificationToken", async (req, res, next) => {
+  // const { verificationToken } = req.params;
+
+  try {
+    const user = await User.findOne({
+      verificationToken: req.params.verificationToken,
+    });
+    console.log("user", user);
+
+    if (user === null) {
+      throw HttpError(404, "User not found");
+    }
+
+    await User.findByIdAndUpdate(user._id, {
+      verify: true,
+      verificationToken: null,
+    });
+
+    res.json({
+      message: "Verification successful",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/verify", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      throw HttpError(404, "Email not found");
+    }
+    if (user.verify) {
+      throw HttpError(400, "Verification has already been passed");
+    }
+
+    await sendEmail({
+      to: email,
+      subject: "Verify email",
+      html: `<a target="_blank" href="http://localhost:3000/users/verify/${user.verificationToken}">Please click on this link to confirm your email</a>`,
+      text: `Please click on the following link to confirm your email: http://localhost:3000/users/verify/${user.verificationToken}`,
+    });
+
+    res.json({
+      message: "Verification email sent",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // authRouter.get("/avatars/getMy", auth, async (req, res, next) => {
 //   try {
