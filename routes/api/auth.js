@@ -17,6 +17,7 @@ import User, {
 import { upload } from "../../middleware/upload.js";
 
 import dotenv from "dotenv";
+import checkBody from "../../middleware/checkBody.js";
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,13 +36,6 @@ const validateBody = (schema) => {
   return func;
 };
 
-const isEmptyBody = (req, res, next) => {
-  if (!Object.keys(req.body).length) {
-    return next(HttpError(400, "Missing required name field"));
-  }
-  next();
-};
-
 const userRegisterValidate = validateBody(userRegisterSchema);
 const userLoginValidate = validateBody(userLoginSchema);
 
@@ -49,7 +43,7 @@ const authRouter = express.Router();
 
 authRouter.post(
   "/signup",
-  isEmptyBody,
+  checkBody,
   userRegisterValidate,
   async (req, res, next) => {
     try {
@@ -78,7 +72,7 @@ authRouter.post(
   }
 );
 
-authRouter.post("/login", isEmptyBody, userLoginValidate, async (req, res) => {
+authRouter.post("/login", checkBody, userLoginValidate, async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
@@ -139,6 +133,7 @@ authRouter.get("/current", auth, async (req, res) => {
 authRouter.patch(
   "/avatars",
   auth,
+  checkBody,
   upload.single("avatar"),
   async (req, res, next) => {
     try {
