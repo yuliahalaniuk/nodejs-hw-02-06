@@ -62,7 +62,7 @@ authRouter.post(
       const verificationToken = crypto.randomUUID();
 
       await sendEmail({
-        to: "yuhalaniuk@ukr.net",
+        to: email,
         subject: "Email Confirmation",
         html: `<a target="_blank" href='http://localhost:3000/users/verify/${verificationToken}'>Please click on the this link to confirm your email</a>`,
         text: `Please click on the following link to confirm your email: http://localhost:3000/users/verify/${verificationToken}`,
