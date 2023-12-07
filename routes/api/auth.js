@@ -74,7 +74,7 @@ authRouter.post(
   }
 );
 
-authRouter.post("/login", checkBody, userLoginValidate, async (req, res) => {
+authRouter.post("/login", checkBody, userLoginValidate, async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
@@ -109,7 +109,7 @@ authRouter.post("/login", checkBody, userLoginValidate, async (req, res) => {
   }
 });
 
-authRouter.post("/logout", auth, async (req, res) => {
+authRouter.post("/logout", auth, async (req, res, next) => {
   try {
     if (req.user) {
       await User.findByIdAndUpdate(req.user._id, { token: "" });
@@ -120,7 +120,7 @@ authRouter.post("/logout", auth, async (req, res) => {
   }
 });
 
-authRouter.get("/current", auth, async (req, res) => {
+authRouter.get("/current", auth, async (req, res, next) => {
   const { email, subscription } = req.user;
   try {
     res.json({
