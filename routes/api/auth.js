@@ -85,46 +85,51 @@ authRouter.post(
   }
 );
 
-authRouter.post("/login", checkBody, userLoginValidate, async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
+authRouter.post(
+  "/login",
+  checkBody,
+  userLoginValidate,
+  async (req, res, next) => {
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
 
-    if (user === null) {
-      throw HttpError(401, "Email or password is wrong");
+      if (user === null) {
+        throw HttpError(401, "Email or password is wrong");
+      }
+
+      if (!user.verify) {
+        throw HttpError(401, "This email is not verified");
+      }
+
+      const isMatch = await bcrypt.compare(password, user.password);
+
+      if (!isMatch) {
+        throw HttpError(401, "Email or password is wrong");
+      }
+
+      const payload = {
+        contactId: user._id,
+      };
+
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "20h" });
+
+      await User.findByIdAndUpdate(user._id, { token });
+
+      res.json({
+        token,
+        user: {
+          email: user.email,
+          subscription: user.subscription,
+        },
+      });
+    } catch (error) {
+      next(error);
     }
-
-    if (!user.verify) {
-      throw HttpError(401, "This email is not verified");
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      throw HttpError(401, "Email or password is wrong");
-    }
-
-    const payload = {
-      contactId: user._id,
-    };
-
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "20h" });
-
-    await User.findByIdAndUpdate(user._id, { token });
-
-    res.json({
-      token,
-      user: {
-        email: user.email,
-        subscription: user.subscription,
-      },
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
-authRouter.post("/logout", auth, async (req, res) => {
+authRouter.post("/logout", auth, async (req, res, next) => {
   try {
     if (req.user) {
       await User.findByIdAndUpdate(req.user._id, { token: "" });
@@ -135,7 +140,7 @@ authRouter.post("/logout", auth, async (req, res) => {
   }
 });
 
-authRouter.get("/current", auth, async (req, res) => {
+authRouter.get("/current", auth, async (req, res, next) => {
   const { email, subscription } = req.user;
   try {
     res.json({
@@ -201,11 +206,11 @@ authRouter.patch(
 );
 
 authRouter.get("/verify/:verificationToken", async (req, res, next) => {
-  // const { verificationToken } = req.params;
+  const { verificationToken } = req.params;
 
   try {
     const user = await User.findOne({
-      verificationToken: req.params.verificationToken,
+      verificationToken,
     });
     console.log("user", user);
 
@@ -226,7 +231,7 @@ authRouter.get("/verify/:verificationToken", async (req, res, next) => {
   }
 });
 
-authRouter.post("/verify", async (req, res) => {
+authRouter.post("/verify", async (req, res, next) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
@@ -234,6 +239,7 @@ authRouter.post("/verify", async (req, res) => {
     if (!user) {
       throw HttpError(404, "Email not found");
     }
+
     if (user.verify) {
       throw HttpError(400, "Verification has already been passed");
     }
