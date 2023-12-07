@@ -22,6 +22,9 @@ const userSchema = new Schema(
       type: String,
       default: null,
     },
+    avatarURL: {
+      type: String,
+    },
   },
   { versionKey: false }
 );
@@ -36,12 +39,26 @@ export const userRegisterSchema = Joi.object({
   password: Joi.string().min(6).required(),
   email: Joi.string().pattern(emailRegexp).required(),
   subscription: Joi.string().required(),
-  // token: Joi.string()
 });
 
 export const userLoginSchema = Joi.object({
   password: Joi.string().min(6).required(),
   email: Joi.string().pattern(emailRegexp).required(),
+});
+
+export const userAvatarSchema = Joi.object({
+  avatar: Joi.object({
+    fieldname: Joi.string().valid("avatar").required(),
+    originalname: Joi.string().required(),
+    encoding: Joi.string().required(),
+    mimetype: Joi.string()
+      .valid("image/png", "image/jpeg", "image/gif")
+      .required(),
+    size: Joi.number().required(),
+    destination: Joi.string().required(),
+    filename: Joi.string().required(),
+    path: Joi.string().required(),
+  }).required(),
 });
 
 const User = model("user", userSchema);

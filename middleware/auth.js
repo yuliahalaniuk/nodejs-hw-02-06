@@ -6,7 +6,7 @@ dotenv.config();
 
 const { JWT_SECRET } = process.env;
 
-export const auth = async (req, _, next) => {
+export const auth = async (req, res, next) => {
   const { authorization } = req.headers;
 
   if (authorization === undefined) {

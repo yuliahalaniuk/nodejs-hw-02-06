@@ -1,4 +1,6 @@
 node_modules/
+tmp/*
+public/avatars/*
 .env
 .idea
 .vscode
