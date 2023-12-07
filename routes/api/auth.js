@@ -11,13 +11,14 @@ import Jimp from "jimp";
 import { auth } from "../../middleware/auth.js";
 import { HttpError } from "../../helpers/HttpError.js";
 import User, {
+  userAvatarSchema,
   userLoginSchema,
   userRegisterSchema,
 } from "../../models/user.js";
 import { upload } from "../../middleware/upload.js";
+import checkBody from "../../middleware/checkBody.js";
 
 import dotenv from "dotenv";
-import checkBody from "../../middleware/checkBody.js";
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,6 +29,7 @@ const { JWT_SECRET } = process.env;
 const validateBody = (schema) => {
   const func = (req, res, next) => {
     const { error } = schema.validate(req.body);
+
     if (error) {
       return next(HttpError(400, error.message));
     }
@@ -133,10 +135,17 @@ authRouter.get("/current", auth, async (req, res) => {
 authRouter.patch(
   "/avatars",
   auth,
-  checkBody,
   upload.single("avatar"),
   async (req, res, next) => {
     try {
+      const { error: fileError } = userAvatarSchema.validate({
+        avatar: req.file,
+      });
+
+      if (fileError) {
+        throw HttpError(400, `Invalid file information`);
+      }
+
       const avatarPath = path.join(
         __dirname,
         "..",
