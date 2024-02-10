@@ -1,5 +1,5 @@
 import express from "express";
-import { isValidObjectId } from "mongoose";
+import { isValidObjectId, startSession } from "mongoose";
 import Joi from "joi";
 import Contact from "../../models/contacts.js";
 import { HttpError } from "../../helpers/HttpError.js";
@@ -55,7 +55,10 @@ router.get("/:contactId", auth, async (req, res, next) => {
     const result = await Contact.findOne({ _id: contactId, owner });
 
     if (!result) {
-      throw HttpError(404, `Contact with ${contactId} id not found`);
+      throw HttpError(
+        404,
+        `Contact with this id not found in your contact list`
+      );
     }
 
     res.json(result);
@@ -90,10 +93,13 @@ router.delete("/:contactId", auth, async (req, res, next) => {
     const { _id: owner } = req.user;
     const { contactId } = req.params;
 
-    const result = await Contact.findOneAndDelete({ _id: contactId });
+    const result = await Contact.findOneAndDelete({ _id: contactId, owner });
 
     if (!result) {
-      throw HttpError(404, `Contact with ${contactId} id not found`);
+      throw HttpError(
+        404,
+        `Contact with this id not found in your contact list`
+      );
     }
 
     res.json({ message: "Contact deleted" });
@@ -130,7 +136,10 @@ router.put("/:contactId", auth, async (req, res, next) => {
     );
 
     if (!result) {
-      throw HttpError(404, `Contact with ${contactId} not found`);
+      throw HttpError(
+        404,
+        `Contact with this id not found in your contact list`
+      );
     }
 
     res.status(200).json(result);
@@ -153,7 +162,10 @@ router.patch("/:contactId/favorite", async (req, res, next) => {
       throw HttpError(400, error.message);
     }
 
-    const result = await Contact.findByIdAndUpdate(contactId, req.body);
+    const result = await Contact.findOneAndUpdate(
+      { contactId, owner },
+      req.body
+    );
 
     if (!result) {
       throw HttpError(404, `Contact with ${contactId} not found`);
